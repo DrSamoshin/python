@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Start PostgreSQL for tests
+        run: |
+          docker compose -f docker/docker-compose.test.yml up -d
+          # Wait for PostgreSQL to be ready
+          until docker exec myapp_postgres_test pg_isready -U test_user -d myapp_test; do
+            echo "Waiting for PostgreSQL..."
+            sleep 1
+          done
+      
+      - name: Install dependencies
+        run: uv pip install --system -r pyproject.toml
+      
+      - name: Run tests
+        run: uv run pytest tests/integration/ -v
+      
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose -f docker/docker-compose.test.yml down
