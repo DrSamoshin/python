@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     app_port: int = 8080
 
     # Environment
-    env: Literal["dev", "prod", "test"] = "dev"
+    env: Literal["dev", "prod"] = "dev"  # Default to test for safety
     log_level: str = "INFO"
     cors_origins: str = ""
     workers: int = 4
@@ -27,7 +27,6 @@ class Settings(BaseSettings):
         urls = {
             "dev": "postgresql+asyncpg://dev_user:dev_pass@localhost:5432/myapp_dev",
             "prod": os.getenv("DATABASE_URL", ""),
-            "test": "postgresql+asyncpg://test_user:test_pass@localhost:5432/myapp_test",
         }
         return urls.get(self.env, urls["dev"])
 
