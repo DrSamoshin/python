@@ -166,3 +166,42 @@ class TestUsersAPI:
         # Verify user is deleted
         get_response = await client.get(f"/api/v1/users/{user_id}")
         assert get_response.status_code == 404
+
+    async def test_refresh_token(self, client: AsyncClient):
+        """Test POST /users/refresh - refresh access token."""
+        apple_id = "apple_id"
+
+        # Create user and get tokens
+        create_response = await client.post(
+            "/v1/users",
+            json={"apple_id": apple_id}
+        )
+
+        assert create_response.status_code == 200
+        tokens = create_response.json()["data"]["tokens"]
+        old_access_token = tokens["access_token"]
+        refresh_token = tokens["refresh_token"]
+
+        # Refresh tokens
+        refresh_response = await client.post(
+            "/v1/users/refresh",
+            json={"refresh_token": refresh_token}
+        )
+
+        # Verify response
+        assert refresh_response.status_code == 200
+        data = refresh_response.json()
+        assert data["status"] == "success"
+        assert "access_token" in data["data"]
+        assert "refresh_token" in data["data"]
+        assert data["data"]["token_type"] == "bearer"
+
+        # Verify new tokens are different from old ones
+        new_access_token = data["data"]["access_token"]
+
+        # Verify new access token works
+        client.headers.update({
+            "Authorization": f"Bearer {new_access_token}"
+        })
+        user_response = await client.get("/v1/users")
+        assert user_response.status_code == 200
