@@ -49,42 +49,39 @@ async def create_user(
     })
 
 
-@router.get("/{user_id}", response_model=SuccessResponse[UserResponse])
+@router.get("", response_model=SuccessResponse[UserResponse])
 async def get_user(
-    user_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> SuccessResponse[UserResponse]:
     """Get user by ID. Requires authentication."""
     service = UserService(db)
-    user = await service.get_user(user_id)
+    user = await service.get_user(current_user.id)
     return SuccessResponse(data=UserResponse.model_validate(user))
 
 
-@router.patch("/{user_id}", response_model=SuccessResponse[UserResponse])
+@router.patch("", response_model=SuccessResponse[UserResponse])
 async def update_user_name(
-    user_id: UUID,
     user_data: UserNameUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> SuccessResponse[UserResponse]:
     """Update user name. Requires authentication."""
     service = UserService(db)
-    user = await service.update_user_name(user_id, user_data.name)
+    user = await service.update_user_name(current_user.id, user_data.name)
     logger.info(f"User updated: {user.id}")
     return SuccessResponse(data=UserResponse.model_validate(user))
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
-    user_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> None:
     """Delete user. Requires authentication."""
     service = UserService(db)
-    await service.delete_user(user_id)
-    logger.info(f"User deleted: {user_id}")
+    await service.delete_user(current_user.id)
+    logger.info(f"User deleted: {current_user.id}")
 
 
 @router.post("/refresh", response_model=SuccessResponse[TokenResponse])

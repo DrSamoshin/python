@@ -10,11 +10,11 @@ from src.api.services.user_service import UserService
 from src.models.user import User
 from src.api.exceptions import UnauthorizedError
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """
@@ -23,6 +23,10 @@ async def get_current_user(
     Expects Authorization header in format: "Bearer <token>"
     Raises UnauthorizedError if token is invalid or user not found.
     """
+    # Check if credentials are provided
+    if credentials is None:
+        raise UnauthorizedError("Authorization header is required")
+
     # Extract token from credentials
     token = credentials.credentials
 

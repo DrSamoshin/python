@@ -82,7 +82,7 @@ class TestUsersAPI:
         })
 
         # Get user
-        response = await client.get(f"/v1/users/{user_id}")
+        response = await client.get(f"/v1/users")
         
         # Verify
         assert response.status_code == 200
@@ -91,18 +91,24 @@ class TestUsersAPI:
         assert data["data"]["id"] == user_id
         assert data["data"]["apple_id"] == apple_id
 
-    async def test_get_user_not_found(self, client: AsyncClient, auth_headers: dict):
-        """Test GET /users/{id} - non-existent user returns 404."""
-        from uuid import uuid4
+    async def test_get_user_without_token(self, client: AsyncClient):
+        """Test GET /users/{id} - get user by ID."""
+        apple_id = "apple_id"
+        # Create user
+        create_response = await client.post(
+            "/v1/users",
+            json={"apple_id": apple_id}
+        )
+        user_id = create_response.json()["data"]["user"]["id"]
 
-        client.headers.update(auth_headers)
-        response = await client.get(f"/v1/users/{uuid4()}")
-        
-        # Verify error
-        assert response.status_code == 404
+        # Get user
+        response = await client.get(f"/v1/users")
+
+        # Verify 401 error
+        assert response.status_code == 401
         data = response.json()
         assert data["status"] == "error"
-        assert data["error"]["code"] == "USER_NOT_FOUND"
+        assert data["error"]["code"] == "UNAUTHORIZED"
 
     async def test_update_user_name(self, client: AsyncClient):
         """Test PATCH /users/{id} - update user name."""
@@ -123,7 +129,7 @@ class TestUsersAPI:
 
         # Update name
         response = await client.patch(
-            f"/v1/users/{user_id}",
+            f"/v1/users",
             json={"name": new_name}
         )
 
@@ -151,7 +157,7 @@ class TestUsersAPI:
         })
         
         # Delete user
-        response = await client.delete(f"/v1/users/{user_id}")
+        response = await client.delete(f"/v1/users")
         
         # Verify
         assert response.status_code == 204
@@ -160,15 +166,3 @@ class TestUsersAPI:
         # Verify user is deleted
         get_response = await client.get(f"/api/v1/users/{user_id}")
         assert get_response.status_code == 404
-
-    async def test_delete_user_not_found(self, client: AsyncClient, auth_headers):
-        """Test DELETE /users/{id} - non-existent user returns 404."""
-        from uuid import uuid4
-        client.headers.update(auth_headers)
-        response = await client.delete(f"/v1/users/{uuid4()}")
-        
-        # Verify error
-        assert response.status_code == 404
-        data = response.json()
-        assert data["status"] == "error"
-        assert data["error"]["code"] == "USER_NOT_FOUND"
