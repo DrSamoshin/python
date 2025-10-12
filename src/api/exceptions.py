@@ -45,10 +45,21 @@ class UserAlreadyExistsError(AppException):
 
 class ValidationError(AppException):
     """Raised for validation errors."""
-    
+
     def __init__(self, message: str = "Validation error"):
         super().__init__(
             message=message,
             status_code=422,
             error_code="VALIDATION_ERROR"
+        )
+
+
+class UnauthorizedError(AppException):
+    """Raised when authentication fails or token is invalid."""
+
+    def __init__(self, message: str = "Unauthorized"):
+        super().__init__(
+            message=message,
+            status_code=401,
+            error_code="UNAUTHORIZED"
         )

@@ -22,11 +22,11 @@ class TestUsersAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert data["data"]["name"] == name
-        assert data["data"]["email"] == email
-        assert data["data"]["apple_id"] == apple_id
-        assert "id" in data["data"]
-        assert "created_at" in data["data"]
+        assert data["data"]["user"]["name"] == name
+        assert data["data"]["user"]["email"] == email
+        assert data["data"]["user"]["apple_id"] == apple_id
+        assert "id" in data["data"]["user"]
+        assert "created_at" in data["data"]["user"]
 
     async def test_create_user_only_with_apple_id(self, client: AsyncClient):
         apple_id = "apple_id"
@@ -40,11 +40,11 @@ class TestUsersAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert data["data"]["name"] is None
-        assert data["data"]["email"] is None
-        assert data["data"]["apple_id"] == apple_id
-        assert "id" in data["data"]
-        assert "created_at" in data["data"]
+        assert data["data"]["user"]["name"] is None
+        assert data["data"]["user"]["email"] is None
+        assert data["data"]["user"]["apple_id"] == apple_id
+        assert "id" in data["data"]["user"]
+        assert "created_at" in data["data"]["user"]
 
     async def test_create_user_duplicate_apple_id(self, client: AsyncClient):
         """Test POST /users - duplicate apple_id returns 200."""
@@ -56,16 +56,16 @@ class TestUsersAPI:
         )
         
         # Try to create second user with same email
-        response = await client.post(
+        second_user = await client.post(
             "/v1/users",
             json={"apple_id": apple_id}
         )
         
         # Verify error
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "success"
-        assert data["data"]["id"] == first_user.json()["data"]["id"]
+        assert second_user.status_code == 200
+        first_user_data = first_user.json()
+        second_user_data = second_user.json()
+        assert first_user_data == second_user_data
 
     async def test_get_user(self, client: AsyncClient):
         """Test GET /users/{id} - get user by ID."""
@@ -75,8 +75,12 @@ class TestUsersAPI:
             "/v1/users",
             json={"apple_id": apple_id}
         )
-        user_id = create_response.json()["data"]["id"]
-        
+        user_id = create_response.json()["data"]["user"]["id"]
+        # Add headers в client
+        client.headers.update({
+            "Authorization": f"Bearer {create_response.json()['data']['tokens']['access_token']}"
+        })
+
         # Get user
         response = await client.get(f"/v1/users/{user_id}")
         
@@ -87,10 +91,11 @@ class TestUsersAPI:
         assert data["data"]["id"] == user_id
         assert data["data"]["apple_id"] == apple_id
 
-    async def test_get_user_not_found(self, client: AsyncClient):
+    async def test_get_user_not_found(self, client: AsyncClient, auth_headers: dict):
         """Test GET /users/{id} - non-existent user returns 404."""
         from uuid import uuid4
-        
+
+        client.headers.update(auth_headers)
         response = await client.get(f"/v1/users/{uuid4()}")
         
         # Verify error
@@ -110,14 +115,18 @@ class TestUsersAPI:
             "/v1/users",
             json={"apple_id": apple_id, "name": name, "email": email}
         )
-        user_id = create_response.json()["data"]["id"]
-        
+        user_id = create_response.json()["data"]["user"]["id"]
+        # Add headers в client
+        client.headers.update({
+            "Authorization": f"Bearer {create_response.json()['data']['tokens']['access_token']}"
+        })
+
         # Update name
         response = await client.patch(
             f"/v1/users/{user_id}",
             json={"name": new_name}
         )
-        
+
         # Verify
         assert response.status_code == 200
         data = response.json()
@@ -136,7 +145,10 @@ class TestUsersAPI:
             "/v1/users",
             json={"apple_id": apple_id, "name": name, "email": email}
         )
-        user_id = create_response.json()["data"]["id"]
+        user_id = create_response.json()["data"]["user"]["id"]
+        client.headers.update({
+            "Authorization": f"Bearer {create_response.json()['data']['tokens']['access_token']}"
+        })
         
         # Delete user
         response = await client.delete(f"/v1/users/{user_id}")
@@ -149,10 +161,10 @@ class TestUsersAPI:
         get_response = await client.get(f"/api/v1/users/{user_id}")
         assert get_response.status_code == 404
 
-    async def test_delete_user_not_found(self, client: AsyncClient):
+    async def test_delete_user_not_found(self, client: AsyncClient, auth_headers):
         """Test DELETE /users/{id} - non-existent user returns 404."""
         from uuid import uuid4
-        
+        client.headers.update(auth_headers)
         response = await client.delete(f"/v1/users/{uuid4()}")
         
         # Verify error

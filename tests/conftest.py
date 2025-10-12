@@ -72,3 +72,16 @@ async def client(test_db_session) -> AsyncGenerator[AsyncClient, None]:
         yield client
 
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def auth_headers(client: AsyncClient) -> dict:
+    """Create user and return auth headers."""
+    response = await client.post(
+        "/v1/users",
+        json={"apple_id": "test_apple_id"}
+    )
+    data = response.json()
+    access_token = data["data"]["tokens"]["access_token"]
+
+    return {"Authorization": f"Bearer {access_token}"}
