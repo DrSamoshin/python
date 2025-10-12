@@ -31,9 +31,23 @@ class UserRepository:
         )
         return result.scalar_one_or_none()
 
-    async def create(self, name: str, email: str) -> User:
+    async def get_by_apple_id(self, apple_id: str) -> Optional[User]:
+        """Get user by email."""
+        result = await self.session.execute(
+            select(User).where(User.apple_id == apple_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def create(self,
+                     apple_id: str,
+                     email: str | None = None,
+                     name: str | None = None,
+                     is_active: bool = True) -> User:
         """Create new user. Does NOT commit."""
-        user = User(name=name, email=email)
+        user = User(name=name,
+                    email=email,
+                    apple_id=apple_id,
+                    is_active=is_active)
         self.session.add(user)
         return user
 

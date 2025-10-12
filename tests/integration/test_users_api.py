@@ -9,48 +9,71 @@ class TestUsersAPI:
     """Test Users CRUD API endpoints."""
 
     async def test_create_user(self, client: AsyncClient):
+        name = "John Doe"
+        email = "john@example.com"
+        apple_id = "apple_id"
         """Test POST /users - create new user."""
         response = await client.post(
             "/v1/users",
-            json={"name": "John Doe", "email": "john@example.com"}
+            json={"name": name, "email": email, "apple_id": apple_id}
         )
         
         # Verify response
-        assert response.status_code == 201
+        assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert data["data"]["name"] == "John Doe"
-        assert data["data"]["email"] == "john@example.com"
+        assert data["data"]["name"] == name
+        assert data["data"]["email"] == email
+        assert data["data"]["apple_id"] == apple_id
         assert "id" in data["data"]
         assert "created_at" in data["data"]
 
-    async def test_create_user_duplicate_email(self, client: AsyncClient):
-        """Test POST /users - duplicate email returns 400."""
-        # Create first user
-        await client.post(
+    async def test_create_user_only_with_apple_id(self, client: AsyncClient):
+        apple_id = "apple_id"
+        """Test POST /users - create new user."""
+        response = await client.post(
             "/v1/users",
-            json={"name": "John Doe", "email": "john@example.com"}
+            json={"apple_id": apple_id}
+        )
+
+        # Verify response
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["data"]["name"] is None
+        assert data["data"]["email"] is None
+        assert data["data"]["apple_id"] == apple_id
+        assert "id" in data["data"]
+        assert "created_at" in data["data"]
+
+    async def test_create_user_duplicate_apple_id(self, client: AsyncClient):
+        """Test POST /users - duplicate apple_id returns 200."""
+        apple_id = "apple_id"
+        # Create first user
+        first_user = await client.post(
+            "/v1/users",
+            json={"apple_id": apple_id}
         )
         
         # Try to create second user with same email
         response = await client.post(
             "/v1/users",
-            json={"name": "Jane Doe", "email": "john@example.com"}
+            json={"apple_id": apple_id}
         )
         
         # Verify error
-        assert response.status_code == 400
+        assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "error"
-        assert data["error"]["code"] == "USER_ALREADY_EXISTS"
-        assert "john@example.com" in data["error"]["message"]
+        assert data["status"] == "success"
+        assert data["data"]["id"] == first_user.json()["data"]["id"]
 
     async def test_get_user(self, client: AsyncClient):
         """Test GET /users/{id} - get user by ID."""
+        apple_id = "apple_id"
         # Create user
         create_response = await client.post(
             "/v1/users",
-            json={"name": "Jane Doe", "email": "jane@example.com"}
+            json={"apple_id": apple_id}
         )
         user_id = create_response.json()["data"]["id"]
         
@@ -62,8 +85,7 @@ class TestUsersAPI:
         data = response.json()
         assert data["status"] == "success"
         assert data["data"]["id"] == user_id
-        assert data["data"]["name"] == "Jane Doe"
-        assert data["data"]["email"] == "jane@example.com"
+        assert data["data"]["apple_id"] == apple_id
 
     async def test_get_user_not_found(self, client: AsyncClient):
         """Test GET /users/{id} - non-existent user returns 404."""
@@ -79,32 +101,40 @@ class TestUsersAPI:
 
     async def test_update_user_name(self, client: AsyncClient):
         """Test PATCH /users/{id} - update user name."""
+        name = "John Doe"
+        new_name = "John"
+        email = "john@example.com"
+        apple_id = "apple_id"
         # Create user
         create_response = await client.post(
             "/v1/users",
-            json={"name": "Old Name", "email": "user@example.com"}
+            json={"apple_id": apple_id, "name": name, "email": email}
         )
         user_id = create_response.json()["data"]["id"]
         
         # Update name
         response = await client.patch(
             f"/v1/users/{user_id}",
-            json={"name": "New Name"}
+            json={"name": new_name}
         )
         
         # Verify
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert data["data"]["name"] == "New Name"
-        assert data["data"]["email"] == "user@example.com"
+        assert data["data"]["apple_id"] == apple_id
+        assert data["data"]["name"] == new_name
+        assert data["data"]["email"] == email
 
     async def test_delete_user(self, client: AsyncClient):
         """Test DELETE /users/{id} - delete user."""
+        name = "John Doe"
+        email = "john@example.com"
+        apple_id = "apple_id"
         # Create user
         create_response = await client.post(
             "/v1/users",
-            json={"name": "To Delete", "email": "delete@example.com"}
+            json={"apple_id": apple_id, "name": name, "email": email}
         )
         user_id = create_response.json()["data"]["id"]
         

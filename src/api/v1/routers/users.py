@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.core.database import get_db
 from src.api.v1.schemas import SuccessResponse
-from src.api.v1.schemas.user import UserCreate, UserUpdate, UserResponse
+from src.api.v1.schemas.user import UserCreate, UserNameUpdate, UserResponse
 from src.api.services.user_service import UserService
 
 import logging
@@ -15,14 +15,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, response_model=SuccessResponse[UserResponse])
+@router.post("", status_code=status.HTTP_200_OK, response_model=SuccessResponse[UserResponse])
 async def create_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db)
 ) -> SuccessResponse[UserResponse]:
     """Create a new user."""
     service = UserService(db)
-    user = await service.create_user(name=user_data.name, email=user_data.email)
+    user = await service.create_user_with_apple_id(apple_id=user_data.apple_id,
+                                                   name=user_data.name,
+                                                   email=user_data.email,
+                                                   is_active=True)
     logger.info(f"User created: {user.id}")
     return SuccessResponse(data=UserResponse.model_validate(user))
 
@@ -41,7 +44,7 @@ async def get_user(
 @router.patch("/{user_id}", response_model=SuccessResponse[UserResponse])
 async def update_user_name(
     user_id: UUID,
-    user_data: UserUpdate,
+    user_data: UserNameUpdate,
     db: AsyncSession = Depends(get_db)
 ) -> SuccessResponse[UserResponse]:
     """Update user name."""

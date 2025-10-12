@@ -12,44 +12,55 @@ class TestUserService:
 
     async def test_create_user(self, test_db_session):
         """Test creating a new user."""
+        apple_id = "apple_id"
+        name = "John Doe"
+        email = "john@example.com"
         service = UserService(test_db_session)
         
         # Create user
-        user = await service.create_user(name="John Doe", email="john@example.com")
+        user = await service.create_user_with_apple_id(apple_id=apple_id, name=name, email=email, is_active=True)
         
         # Verify
         assert user.id is not None
-        assert user.name == "John Doe"
-        assert user.email == "john@example.com"
+        assert user.apple_id == apple_id
+        assert user.name == name
+        assert user.email == email
+        assert user.is_active
 
-    async def test_create_user_duplicate_email(self, test_db_session):
+    async def test_create_user_duplicate_apple_id(self, test_db_session):
         """Test creating user with duplicate email raises error."""
+        apple_id = "apple_id"
+        name = "John Doe"
+        email = "john@example.com"
         service = UserService(test_db_session)
         
         # Create first user
-        await service.create_user(name="John Doe", email="john@example.com")
+        first_user = await service.create_user_with_apple_id(apple_id=apple_id, name=name, email=email, is_active=True)
         
         # Try to create second user with same email
-        with pytest.raises(UserAlreadyExistsError) as exc_info:
-            await service.create_user(name="Jane Doe", email="john@example.com")
+        second_user = await service.create_user_with_apple_id(apple_id=apple_id, name=name, email=email, is_active=True)
         
         # Verify error message
-        assert "john@example.com" in str(exc_info.value)
+        assert first_user is second_user
 
     async def test_get_user(self, test_db_session):
         """Test getting user by ID."""
+        apple_id = "apple_id"
+        name = "John Doe"
+        email = "john@example.com"
         service = UserService(test_db_session)
         
         # Create user
-        created_user = await service.create_user(name="Jane Doe", email="jane@example.com")
+        created_user = await service.create_user_with_apple_id(apple_id=apple_id, name=name, email=email, is_active=True)
         
         # Get user
         found_user = await service.get_user(created_user.id)
         
         # Verify
         assert found_user.id == created_user.id
-        assert found_user.name == "Jane Doe"
-        assert found_user.email == "jane@example.com"
+        assert found_user.apple_id == apple_id
+        assert found_user.name == name
+        assert found_user.email == email
 
     async def test_get_user_not_found(self, test_db_session):
         """Test getting non-existent user raises error."""
@@ -64,18 +75,22 @@ class TestUserService:
 
     async def test_get_user_by_email(self, test_db_session):
         """Test getting user by email."""
+        apple_id = "apple_id"
+        name = "John Doe"
+        email = "john@example.com"
         service = UserService(test_db_session)
         
         # Create user
-        await service.create_user(name="Bob Smith", email="bob@example.com")
+        await service.create_user_with_apple_id(apple_id=apple_id, name=name, email=email, is_active=True)
         
         # Get by email
-        found_user = await service.get_user_by_email("bob@example.com")
+        found_user = await service.get_user_by_email(email)
         
         # Verify
         assert found_user is not None
-        assert found_user.name == "Bob Smith"
-        assert found_user.email == "bob@example.com"
+        assert found_user.apple_id == apple_id
+        assert found_user.name == name
+        assert found_user.email == email
 
     async def test_get_user_by_email_not_found(self, test_db_session):
         """Test getting user by non-existent email returns None."""
@@ -89,18 +104,23 @@ class TestUserService:
 
     async def test_update_user_name(self, test_db_session):
         """Test updating user name."""
+        apple_id = "apple_id"
+        name = "John Doe"
+        new_name = "Bob"
+        email = "john@example.com"
         service = UserService(test_db_session)
         
         # Create user
-        user = await service.create_user(name="Old Name", email="user@example.com")
+        user = await service.create_user_with_apple_id(apple_id=apple_id, name=name, email=email, is_active=True)
         
         # Update name
-        updated_user = await service.update_user_name(user.id, "New Name")
+        updated_user = await service.update_user_name(user.id, new_name)
         
         # Verify
         assert updated_user.id == user.id
-        assert updated_user.name == "New Name"
-        assert updated_user.email == "user@example.com"
+        assert updated_user.apple_id == apple_id
+        assert updated_user.name == new_name
+        assert updated_user.email == email
 
     async def test_update_user_name_not_found(self, test_db_session):
         """Test updating non-existent user raises error."""
@@ -112,10 +132,13 @@ class TestUserService:
 
     async def test_delete_user(self, test_db_session):
         """Test deleting user."""
+        apple_id = "apple_id"
+        name = "John Doe"
+        email = "john@example.com"
         service = UserService(test_db_session)
         
         # Create user
-        user = await service.create_user(name="To Delete", email="delete@example.com")
+        user = await service.create_user_with_apple_id(apple_id=apple_id, name=name, email=email, is_active=True)
         user_id = user.id
         
         # Delete user

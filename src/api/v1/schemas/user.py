@@ -5,8 +5,9 @@ from uuid import UUID
 
 class UserBase(BaseModel):
     """Base User schema with common fields."""
-    name: str
-    email: str
+    apple_id: str
+    name: str | None = None
+    email: str | None = None
 
 
 class UserCreate(UserBase):
@@ -14,7 +15,7 @@ class UserCreate(UserBase):
     pass
 
 
-class UserUpdate(BaseModel):
+class UserNameUpdate(BaseModel):
     """Schema for updating user name."""
     name: str
 
@@ -22,6 +23,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     """Schema for user response."""
     id: UUID
+    is_active: bool
     created_at: datetime
     updated_at: datetime
 

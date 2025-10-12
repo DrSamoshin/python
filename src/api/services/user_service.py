@@ -20,18 +20,25 @@ class UserService:
         self.session = session
         self.repo = UserRepository(session)
 
-    async def create_user(self, name: str, email: str) -> User:
+    async def create_user_with_apple_id(self,
+                                        apple_id: str,
+                                        name: str | None = None,
+                                        email: str | None = None,
+                                        is_active: bool = True) -> User:
         """
         Create new user.
         Raises UserAlreadyExistsError if email already exists.
         """
         # Check if email already exists
-        existing_user = await self.repo.get_by_email(email)
+        existing_user = await self.repo.get_by_apple_id(apple_id)
         if existing_user:
-            raise UserAlreadyExistsError(f"User with email {email} already exists")
+            return existing_user
 
         # Create user
-        user = await self.repo.create(name=name, email=email)
+        user = await self.repo.create(apple_id=apple_id,
+                                      name=name,
+                                      email=email,
+                                      is_active=is_active)
 
         # Commit transaction
         try:
@@ -39,7 +46,6 @@ class UserService:
             await self.session.refresh(user)
         except IntegrityError:
             await self.session.rollback()
-            raise UserAlreadyExistsError(f"User with email {email} already exists")
 
         return user
 
