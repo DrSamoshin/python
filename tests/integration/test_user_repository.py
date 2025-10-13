@@ -2,6 +2,7 @@
 
 import pytest
 from src.repositories.user_repository import UserRepository
+from sqlalchemy import text
 
 
 @pytest.mark.integration
@@ -59,7 +60,8 @@ class TestUserRepository:
         
         # Get by ID
         found_user = await repo.get_by_id(created_user.id)
-        
+        # user = await test_db_session.execute(text("SELECT * FROM users WHERE id = :id"), {"id": created_user.id})
+        # result = user.first()
         # Verify
         assert found_user is created_user
 
