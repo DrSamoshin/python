@@ -63,3 +63,25 @@ class UnauthorizedError(AppException):
             status_code=401,
             error_code="UNAUTHORIZED"
         )
+
+
+class NotFoundException(AppException):
+    """Raised when a resource is not found."""
+
+    def __init__(self, message: str = "Resource not found"):
+        super().__init__(
+            message=message,
+            status_code=404,
+            error_code="NOT_FOUND"
+        )
+
+
+class ForbiddenException(AppException):
+    """Raised when user doesn't have permission to access a resource."""
+
+    def __init__(self, message: str = "Access forbidden"):
+        super().__init__(
+            message=message,
+            status_code=403,
+            error_code="FORBIDDEN"
+        )

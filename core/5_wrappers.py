@@ -40,7 +40,7 @@ def timeit(func):
 def slow_func():
     time.sleep(1)
 
-# print(slow_func())
+print(slow_func())
 
 def repeat(n, name):
     def decorator(func):

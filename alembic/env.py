@@ -16,7 +16,7 @@ from src.api.core.database import Base
 from src.api.core.configs import settings
 
 # Import all models here so Alembic can detect them
-from src.models import User  # noqa: F401
+from src.models import User, Chat, Message  # noqa: F401
 
 # this is the Alembic Config object
 config = context.config

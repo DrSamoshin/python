@@ -5,6 +5,7 @@ from src.api.core.configs import settings
 from src.api.middleware import setup_middlewares
 from src.api.exception_handlers import setup_exception_handlers
 from src.api.core.database import close_db
+from src.api.core.redis_client import close_redis
 
 import logging
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Closing database connections...")
     await close_db()
+    await close_redis()
     logger.info("FastAPI app shutting down")
 
 

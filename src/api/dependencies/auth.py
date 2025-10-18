@@ -46,3 +46,40 @@ async def get_current_user(
         raise UnauthorizedError("User is not active")
 
     return user
+
+
+async def get_current_user_ws(
+    authorization: str | None,
+    db: AsyncSession
+) -> User:
+    """
+    Validate access token for WebSocket connection.
+
+    Token is passed in Authorization header: "Bearer <token>"
+    Raises UnauthorizedError if token is invalid or user not found.
+    """
+    if not authorization:
+        raise UnauthorizedError("Authorization header is required")
+
+    # Extract token from "Bearer <token>"
+    if not authorization.startswith("Bearer "):
+        raise UnauthorizedError("Invalid authorization format. Expected 'Bearer <token>'")
+
+    token = authorization.replace("Bearer ", "", 1).strip()
+
+    # Verify token and get user_id
+    auth_service = AuthService()
+    user_id = auth_service.verify_token(token, token_type="access")
+
+    # Get user from database
+    user_service = UserService(db)
+    try:
+        user = await user_service.get_user(user_id)
+    except Exception:
+        raise UnauthorizedError("User not found or token is invalid")
+
+    # Check if user is active
+    if not user.is_active:
+        raise UnauthorizedError("User is not active")
+
+    return user

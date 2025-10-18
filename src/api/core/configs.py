@@ -30,6 +30,19 @@ class Settings(BaseSettings):
         }
         return urls.get(self.env, urls["dev"])
 
+    # Redis
+    @property
+    def redis_url(self) -> str:
+        """Get Redis URL based on environment."""
+        urls = {
+            "dev": "redis://localhost:6379/0",
+            "prod": os.getenv("REDIS_URL", ""),
+        }
+        return urls.get(self.env, urls["dev"])
+
+    redis_cache_ttl: int = 86400  # 24 hours in seconds
+    redis_max_messages: int = 50  # Max messages to keep in cache
+
     # JWT Authentication
     jwt_secret_key: str = "your-secret-key-change-in-production"
     jwt_algorithm: str = "HS256"
