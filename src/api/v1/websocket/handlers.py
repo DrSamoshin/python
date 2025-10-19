@@ -6,8 +6,7 @@ import logging
 import json
 
 from src.api.v1.websocket.connection_manager import ConnectionManager
-from src.api.services import ChatService, MessageService
-from src.models import MessageRole
+from src.api.services import ChatService, ChatSessionService
 from src.api.v1.schemas import MessageSchema
 from src.api.exceptions import NotFoundException, ForbiddenException
 
@@ -29,13 +28,11 @@ class ChatWebSocketHandler:
         self.websocket = websocket
         self.chat_id = chat_id
         self.user_id = user_id
-        self.session = session
-        self.redis = redis
         self.connection_manager = connection_manager
 
         # Services
         self.chat_service = ChatService(session)
-        self.message_service = MessageService(session, redis)
+        self.chat_session_service = ChatSessionService(session, redis)
 
     async def handle_connection(self):
         """Main handler for WebSocket connection lifecycle."""
@@ -50,8 +47,9 @@ class ChatWebSocketHandler:
                 self.user_id
             )
 
-            # Send chat history
-            await self.send_history()
+            # Load initial chat history for session
+            history = await self.chat_session_service.load_initial_history(self.chat_id)
+            logger.info(f"Loaded {len(history)} messages for chat session")
 
             # Main message loop
             await self.message_loop()
@@ -73,22 +71,6 @@ class ChatWebSocketHandler:
     async def verify_access(self):
         """Verify user has access to the chat."""
         await self.chat_service.get_chat(self.chat_id, self.user_id)
-
-    async def send_history(self):
-        """Send chat history to the connected client."""
-        try:
-            messages = await self.message_service.get_chat_history(self.chat_id)
-
-            await self.websocket.send_json({
-                "type": "history",
-                "messages": [msg.model_dump(mode='json') for msg in messages]
-            })
-
-            logger.info(f"Sent {len(messages)} messages history to user {self.user_id}")
-
-        except Exception as e:
-            logger.error(f"Error sending history: {e}")
-            await self.send_error("Failed to load chat history")
 
     async def message_loop(self):
         """Main loop for receiving and processing messages."""
@@ -129,37 +111,22 @@ class ChatWebSocketHandler:
             await self.send_error("Message content cannot be empty")
             return
 
-        # Save user message
-        user_message = await self.message_service.create_message(
-            chat_id=self.chat_id,
-            role=MessageRole.USER,
-            content=content
-        )
+        try:
+            # Process message through ChatSessionService
+            result = await self.chat_session_service.process_user_message(
+                chat_id=self.chat_id,
+                content=content
+            )
 
-        # Send confirmation to user
-        await self.send_message(user_message)
+            # Send messages to client
+            await self.send_message(result.user_message)
+            await self.send_message(result.assistant_message)
 
-        # TODO: Here you will integrate your RAG agent
-        # For now, simple echo response
-        assistant_content = await self.generate_assistant_response(content)
-
-        # Save assistant message
-        assistant_message = await self.message_service.create_message(
-            chat_id=self.chat_id,
-            role=MessageRole.ASSISTANT,
-            content=assistant_content
-        )
-
-        # Send assistant response
-        await self.send_message(assistant_message)
-
-    async def generate_assistant_response(self, user_content: str) -> str:
-        """
-        Generate assistant response using RAG agent.
-        TODO: Replace with actual RAG implementation.
-        """
-        # Placeholder - simple echo for now
-        return f"Echo: {user_content}"
+        except Exception as e:
+            logger.error(f"Error processing user message: {e}", exc_info=True)
+            # Note: AgentOrchestrator already handles LLM errors gracefully
+            # This catch is for unexpected errors in the pipeline
+            await self.send_error("Sorry, I couldn't process your message. Please try again.")
 
     async def send_message(self, message):
         """Send message to client."""

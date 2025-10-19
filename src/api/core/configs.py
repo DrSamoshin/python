@@ -6,7 +6,12 @@ from src.api.core.logging_config import setup_logging
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore",
+        env_prefix="API_"
+    )
 
     # Application
     app_title: str = "test_app"
@@ -42,6 +47,9 @@ class Settings(BaseSettings):
 
     redis_cache_ttl: int = 86400  # 24 hours in seconds
     redis_max_messages: int = 50  # Max messages to keep in cache
+
+    # Chat settings
+    chat_history_limit: int = 15  # Number of messages to use as context for Agent
 
     # JWT Authentication
     jwt_secret_key: str = "your-secret-key-change-in-production"

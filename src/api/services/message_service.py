@@ -58,29 +58,40 @@ class MessageService:
     async def get_chat_history(
             self,
             chat_id: UUID,
+            limit: int | None = None,
             use_cache: bool = True
     ) -> list[MessageSchema]:
         """
         Get chat message history.
         First tries Redis cache, falls back to PostgreSQL.
         Returns messages in chronological order (oldest first).
+
+        Args:
+            chat_id: Chat UUID
+            limit: Maximum number of messages to return (default: cache max_messages)
+            use_cache: Whether to use Redis cache
         """
+        # Use cache max_messages if limit not specified
+        if limit is None:
+            limit = self.cache_service.max_messages
+
         # Try cache first
         if use_cache:
             cached_messages = await self.cache_service.get_messages(chat_id)
             if cached_messages is not None:
                 logger.debug(f"Returning {len(cached_messages)} messages from cache")
-                return cached_messages
+                # Return limited number of messages
+                return cached_messages[-limit:] if limit else cached_messages
 
         # Cache miss - load from DB
         logger.debug(f"Cache miss, loading from DB for chat {chat_id}")
         messages = await self.message_repo.get_recent_messages(
             chat_id=chat_id,
-            limit=self.cache_service.max_messages
+            limit=limit
         )
 
-        # Populate cache for next time
-        if messages:
+        # Populate cache for next time (only if using default cache limit)
+        if messages and limit == self.cache_service.max_messages:
             try:
                 await self.cache_service.set_messages(chat_id, messages)
             except Exception as e:

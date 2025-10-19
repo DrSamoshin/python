@@ -3,12 +3,10 @@
     conftest.py is automatically loaded by pytest.
 """
 
-import pytest
 import pytest_asyncio
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from httpx import AsyncClient, ASGITransport
-from starlette.testclient import TestClient
 
 from src.api.core.database import get_db
 from src.api.app import create_app
@@ -17,7 +15,6 @@ from src.models.user import User  # noqa: F401 - needed for metadata
 from redis.asyncio import Redis
 from src.api.core.redis_client import get_redis
 from src.models import Chat, Message  # noqa: F401 - needed for metadata
-from uuid import UUID
 
 # Test database URL (docker-compose.test.yml uses port 5433)
 TEST_DATABASE_URL = "postgresql+asyncpg://test_user:test_pass@localhost:5433/myapp_test"
