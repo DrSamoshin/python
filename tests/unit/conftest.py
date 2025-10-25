@@ -32,11 +32,13 @@ def sample_user_id():
 
 
 @pytest.fixture
-def mock_user_message():
+def mock_user_message(sample_chat_id):
     """Mock user message."""
     msg = MagicMock()
     msg.role = MessageRole.USER
     msg.content = "Hello"
+    msg.chat_id = sample_chat_id
+    msg.tool_call_data = None
     return msg
 
 
@@ -46,4 +48,5 @@ def mock_assistant_message():
     msg = MagicMock()
     msg.role = MessageRole.ASSISTANT
     msg.content = "Hi there!"
+    msg.tool_call_data = None
     return msg

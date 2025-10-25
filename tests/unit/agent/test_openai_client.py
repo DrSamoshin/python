@@ -32,7 +32,8 @@ class TestOpenAIClientSuccess:
         ):
             result = await openai_client.chat_completion(sample_messages)
 
-            assert result == "I'm doing great, thanks!"
+            # Now returns full ChatCompletion object, not just content
+            assert result.choices[0].message.content == "I'm doing great, thanks!"
 
     @pytest.mark.asyncio
     async def test_chat_completion_with_system_message(self, openai_client, sample_messages):

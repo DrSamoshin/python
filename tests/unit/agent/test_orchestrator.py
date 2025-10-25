@@ -20,11 +20,17 @@ class TestAgentOrchestratorSuccess:
     async def test_process_success(self, orchestrator, sample_request):
         """Test successful message processing."""
         # Mock successful LLM response
+        from unittest.mock import MagicMock
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "I'm doing great, thanks for asking!"
+        mock_response.choices[0].message.tool_calls = None
+
         with patch.object(
             orchestrator.llm_client,
             'chat_completion',
             new_callable=AsyncMock,
-            return_value="I'm doing great, thanks for asking!"
+            return_value=mock_response
         ):
             response = await orchestrator.process(sample_request)
 
@@ -34,11 +40,17 @@ class TestAgentOrchestratorSuccess:
     @pytest.mark.asyncio
     async def test_process_combines_history_and_message(self, orchestrator, sample_request):
         """Test that orchestrator combines chat history and user message."""
+        from unittest.mock import MagicMock
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Response"
+        mock_response.choices[0].message.tool_calls = None
+
         with patch.object(
             orchestrator.llm_client,
             'chat_completion',
             new_callable=AsyncMock,
-            return_value="Response"
+            return_value=mock_response
         ) as mock_llm:
             await orchestrator.process(sample_request)
 
@@ -54,11 +66,17 @@ class TestAgentOrchestratorSuccess:
     @pytest.mark.asyncio
     async def test_process_includes_system_message(self, orchestrator, sample_request):
         """Test that orchestrator includes system message."""
+        from unittest.mock import MagicMock
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Response"
+        mock_response.choices[0].message.tool_calls = None
+
         with patch.object(
             orchestrator.llm_client,
             'chat_completion',
             new_callable=AsyncMock,
-            return_value="Response"
+            return_value=mock_response
         ) as mock_llm:
             await orchestrator.process(sample_request)
 
@@ -161,16 +179,24 @@ class TestAgentOrchestratorIntegration:
     @pytest.mark.asyncio
     async def test_empty_chat_history(self, orchestrator):
         """Test processing with empty chat history."""
+        from unittest.mock import MagicMock
+        from uuid import UUID
         request = AgentRequest(
             chat_history=[],
-            user_message=AgentMessage(role="user", content="Hello")
+            user_message=AgentMessage(role="user", content="Hello"),
+            chat_id=UUID("00000000-0000-0000-0000-000000000001")
         )
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Hi!"
+        mock_response.choices[0].message.tool_calls = None
 
         with patch.object(
             orchestrator.llm_client,
             'chat_completion',
             new_callable=AsyncMock,
-            return_value="Hi!"
+            return_value=mock_response
         ):
             response = await orchestrator.process(request)
 
@@ -180,6 +206,8 @@ class TestAgentOrchestratorIntegration:
     @pytest.mark.asyncio
     async def test_long_chat_history(self, orchestrator):
         """Test processing with long chat history."""
+        from unittest.mock import MagicMock
+        from uuid import UUID
         # Create long history
         history = [
             AgentMessage(role="user" if i % 2 == 0 else "assistant", content=f"Message {i}")
@@ -188,14 +216,20 @@ class TestAgentOrchestratorIntegration:
 
         request = AgentRequest(
             chat_history=history,
-            user_message=AgentMessage(role="user", content="Latest message")
+            user_message=AgentMessage(role="user", content="Latest message"),
+            chat_id=UUID("00000000-0000-0000-0000-000000000001")
         )
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Response"
+        mock_response.choices[0].message.tool_calls = None
 
         with patch.object(
             orchestrator.llm_client,
             'chat_completion',
             new_callable=AsyncMock,
-            return_value="Response"
+            return_value=mock_response
         ) as mock_llm:
             response = await orchestrator.process(request)
 

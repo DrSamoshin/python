@@ -15,13 +15,15 @@ class MessageRepository:
             self,
             chat_id: UUID,
             role: MessageRole,
-            content: str
+            content: str | None = None,
+            tool_call_data: dict | None = None
     ) -> Message:
         """Create a new message."""
         message = Message(
             chat_id=chat_id,
             role=role,
-            content=content
+            content=content,
+            tool_call_data=tool_call_data
         )
         self.session.add(message)
         await self.session.flush()

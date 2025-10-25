@@ -1,20 +1,22 @@
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
 from uuid import UUID
 import logging
-import json
+import asyncio
+from datetime import datetime
 
+from src.api.v1.websocket.base_handler import BaseWebSocketHandler
 from src.api.v1.websocket.connection_manager import ConnectionManager
-from src.api.services import ChatService, ChatSessionService
-from src.api.v1.schemas import MessageSchema
+from src.api.services import ChatService
 from src.api.exceptions import NotFoundException, ForbiddenException
+from src.api.core.configs import settings
 
 logger = logging.getLogger(__name__)
 
 
-class ChatWebSocketHandler:
-    """Handler for chat WebSocket events."""
+class ChatWebSocketHandler(BaseWebSocketHandler):
+    """Handler for authenticated chat WebSocket with idle timeout."""
 
     def __init__(
             self,
@@ -25,31 +27,45 @@ class ChatWebSocketHandler:
             redis: Redis,
             connection_manager: ConnectionManager
     ):
-        self.websocket = websocket
+        super().__init__(websocket, session, redis, connection_manager)
         self.chat_id = chat_id
         self.user_id = user_id
-        self.connection_manager = connection_manager
-
-        # Services
         self.chat_service = ChatService(session)
-        self.chat_session_service = ChatSessionService(session, redis)
+
+        # Idle timeout tracking
+        self.last_activity = datetime.now()
+        self.idle_check_task = None
+
+    async def setup_session(self):
+        """Verify user has access to the chat."""
+        await self.chat_service.get_chat(self.chat_id, self.user_id)
+
+    async def cleanup_session(self):
+        """Cancel idle timeout checker."""
+        if self.idle_check_task:
+            self.idle_check_task.cancel()
+            try:
+                await self.idle_check_task
+            except asyncio.CancelledError:
+                pass
 
     async def handle_connection(self):
-        """Main handler for WebSocket connection lifecycle."""
+        """Extended connection handler with idle timeout."""
         try:
-            # Verify user has access to this chat
-            await self.verify_access()
-
-            # Connect WebSocket
+            # Setup and connect
+            await self.setup_session()
             await self.connection_manager.connect(
                 self.websocket,
                 self.chat_id,
                 self.user_id
             )
 
-            # Load initial chat history for session
+            # Load history
             history = await self.chat_session_service.load_initial_history(self.chat_id)
-            logger.info(f"Loaded {len(history)} messages for chat session")
+            logger.info(f"WebSocket session started: user={self.user_id}, chat={self.chat_id}, messages={len(history)}")
+
+            # Start idle timeout checker
+            self.idle_check_task = asyncio.create_task(self.check_idle_timeout())
 
             # Main message loop
             await self.message_loop()
@@ -58,92 +74,37 @@ class ChatWebSocketHandler:
             logger.warning(f"Access denied for user {self.user_id} to chat {self.chat_id}: {e}")
             await self.websocket.close(code=1008, reason=str(e))
 
-        except WebSocketDisconnect:
-            logger.info(f"WebSocket disconnected for chat {self.chat_id}")
-
         except Exception as e:
-            logger.error(f"Error in WebSocket handler: {e}", exc_info=True)
+            logger.error(f"Error in ChatWebSocketHandler: {e}", exc_info=True)
             await self.send_error("Internal server error")
 
         finally:
-            await self.connection_manager.disconnect(self.websocket, self.chat_id)
-
-    async def verify_access(self):
-        """Verify user has access to the chat."""
-        await self.chat_service.get_chat(self.chat_id, self.user_id)
-
-    async def message_loop(self):
-        """Main loop for receiving and processing messages."""
-        while True:
-            # Receive message from client
-            data = await self.websocket.receive_text()
-
-            try:
-                message_data = json.loads(data)
-                await self.handle_message(message_data)
-
-            except json.JSONDecodeError:
-                await self.send_error("Invalid JSON format")
-
-            except Exception as e:
-                logger.error(f"Error handling message: {e}", exc_info=True)
-                await self.send_error("Failed to process message")
+            await self.cleanup_session()
+            if self.chat_id:
+                await self.connection_manager.disconnect(self.websocket, self.chat_id)
 
     async def handle_message(self, data: dict):
-        """
-        Handle incoming message from user.
-        Expected format: {"type": "message", "content": "text"}
-        """
-        message_type = data.get("type")
+        """Handle message with activity tracking."""
+        self.last_activity = datetime.now()
+        await super().handle_message(data)
 
-        if message_type == "message":
-            await self.handle_user_message(data)
-        elif message_type == "ping":
-            await self.handle_ping()
-        else:
-            await self.send_error(f"Unknown message type: {message_type}")
-
-    async def handle_user_message(self, data: dict):
-        """Process user message and generate assistant response."""
-        content = data.get("content", "").strip()
-
-        if not content:
-            await self.send_error("Message content cannot be empty")
-            return
-
+    async def check_idle_timeout(self):
+        """Background task to check for idle timeout and close connection if exceeded."""
         try:
-            # Process message through ChatSessionService
-            result = await self.chat_session_service.process_user_message(
-                chat_id=self.chat_id,
-                content=content
-            )
+            while True:
+                await asyncio.sleep(30)  # Check every 30 seconds
 
-            # Send messages to client
-            await self.send_message(result.user_message)
-            await self.send_message(result.assistant_message)
+                idle_time = (datetime.now() - self.last_activity).total_seconds()
 
+                if idle_time > settings.websocket_idle_timeout:
+                    logger.info(
+                        f"Closing WebSocket for chat {self.chat_id} due to idle timeout "
+                        f"({idle_time:.0f}s > {settings.websocket_idle_timeout}s)"
+                    )
+                    await self.websocket.close(code=1000, reason="Idle timeout")
+                    break
+
+        except asyncio.CancelledError:
+            logger.debug(f"Idle timeout checker cancelled for chat {self.chat_id}")
         except Exception as e:
-            logger.error(f"Error processing user message: {e}", exc_info=True)
-            # Note: AgentOrchestrator already handles LLM errors gracefully
-            # This catch is for unexpected errors in the pipeline
-            await self.send_error("Sorry, I couldn't process your message. Please try again.")
-
-    async def send_message(self, message):
-        """Send message to client."""
-        message_schema = MessageSchema.model_validate(message)
-
-        await self.websocket.send_json({
-            "type": "message",
-            "data": message_schema.model_dump(mode='json')
-        })
-
-    async def send_error(self, error: str):
-        """Send error message to client."""
-        await self.websocket.send_json({
-            "type": "error",
-            "error": error
-        })
-
-    async def handle_ping(self):
-        """Handle ping for keeping connection alive."""
-        await self.websocket.send_json({"type": "pong"})
+            logger.error(f"Error in idle timeout checker: {e}", exc_info=True)

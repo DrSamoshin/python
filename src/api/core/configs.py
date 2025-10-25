@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     # Chat settings
     chat_history_limit: int = 15  # Number of messages to use as context for Agent
 
+    # WebSocket settings
+    websocket_idle_timeout: int = 300  # 5 minutes in seconds
+    demo_ws_lifetime: int = 120  # 2 minutes in seconds - max lifetime for demo connections
+
     # JWT Authentication
     jwt_secret_key: str = "your-secret-key-change-in-production"
     jwt_algorithm: str = "HS256"

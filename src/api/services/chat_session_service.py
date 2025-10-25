@@ -33,7 +33,8 @@ class ChatSessionService:
     async def process_user_message(
             self,
             chat_id: UUID,
-            content: str
+            content: str,
+            user_id: UUID
     ) -> ChatMessageResult:
         """
         Process user message and generate assistant response.
@@ -41,6 +42,7 @@ class ChatSessionService:
         Args:
             chat_id: Chat UUID
             content: User message content
+            user_id: User UUID from auth token
 
         Returns:
             ChatMessageResult with user and assistant messages
@@ -56,13 +58,21 @@ class ChatSessionService:
         history = await self._get_or_load_history(chat_id)
 
         # 3. Generate assistant response using AgentOrchestrator
-        assistant_content = await self._generate_response(history, user_message)
+        agent_response = await self._generate_response(history, user_message, user_id, chat_id)
 
-        # 4. Save assistant message
+        # 4. Save assistant message with tool metadata
+        tool_call_data = None
+        if agent_response.tool_metadata:
+            tool_call_data = {
+                "tool_calls": [tc.model_dump() for tc in agent_response.tool_metadata.tool_calls],
+                "tool_results": [tr.model_dump() for tr in agent_response.tool_metadata.tool_results]
+            }
+
         assistant_message = await self.message_service.create_message(
             chat_id=chat_id,
             role=MessageRole.ASSISTANT,
-            content=assistant_content
+            content=agent_response.content,
+            tool_call_data=tool_call_data
         )
 
         # 5. Update history cache
@@ -102,22 +112,25 @@ class ChatSessionService:
             if len(self.chat_history_cache[chat_id]) > limit:
                 self.chat_history_cache[chat_id] = self.chat_history_cache[chat_id][-limit:]
 
-    async def _generate_response(self, chat_history: list, user_message) -> str:
+    async def _generate_response(self, chat_history: list, user_message, user_id, chat_id):
         """
         Generate assistant response using AgentOrchestrator.
 
         Args:
             chat_history: List of SQLAlchemy Message objects
             user_message: Current user's SQLAlchemy Message object
+            user_id: User UUID for tools context
+            chat_id: Chat UUID
 
         Returns:
-            Generated response content
+            AgentResponse with content and tool metadata
         """
         # Convert SQLAlchemy Message objects to AgentMessage DTOs
         agent_history = [
             AgentMessage(
                 role=msg.role.value,  # MessageRole enum to string
-                content=msg.content
+                content=msg.content,
+                tool_call_data=msg.tool_call_data
             )
             for msg in chat_history
         ]
@@ -131,10 +144,14 @@ class ChatSessionService:
         # Create AgentRequest
         agent_request = AgentRequest(
             chat_history=agent_history,
-            user_message=agent_user_message
+            user_message=agent_user_message,
+            chat_id=user_message.chat_id
         )
 
         # Process through AgentOrchestrator
-        agent_response = await self.agent_orchestrator.process(agent_request)
+        agent_response = await self.agent_orchestrator.process(
+            agent_request,
+            session=self.session
+        )
 
-        return agent_response.content
+        return agent_response

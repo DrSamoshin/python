@@ -42,6 +42,13 @@ class Chat(Base):
         lazy="selectin",
         order_by="Message.created_at"
     )
+    goals: Mapped[list["Goal"]] = relationship(
+        "Goal",
+        back_populates="chat",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="Goal.created_at"
+    )
     user: Mapped["User"] = relationship(
         "User",
         back_populates="chats",

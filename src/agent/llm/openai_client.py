@@ -1,7 +1,10 @@
 """OpenAI LLM Client with error handling."""
 
 import logging
+import json
+from typing import Any
 from openai import AsyncOpenAI, APIError, AuthenticationError, RateLimitError
+from openai.types.chat import ChatCompletion
 from src.agent.configs import settings
 from src.agent.dto import AgentMessage
 from src.agent.exceptions import (
@@ -23,28 +26,21 @@ class OpenAIClient:
         self.temperature = settings.openai_temperature
         self.max_tokens = settings.openai_max_tokens
 
-    async def chat_completion(
+    def _build_openai_messages(
             self,
             messages: list[AgentMessage],
             system_message: str | None = None
-    ) -> str:
+    ) -> list[dict[str, Any]]:
         """
-        Call OpenAI API with proper error handling.
+        Convert AgentMessage list to OpenAI format, handling tool_call_data.
 
         Args:
             messages: Message history (AgentMessage DTOs)
             system_message: System message (optional)
 
         Returns:
-            Generated response content
-
-        Raises:
-            LLMAuthenticationError: Invalid API key
-            LLMRateLimitError: Rate limit exceeded
-            LLMContextLengthError: Context length exceeded
-            LLMError: Other LLM errors
+            List of messages in OpenAI format
         """
-        # Convert AgentMessage to OpenAI format
         openai_messages = []
 
         if system_message:
@@ -54,20 +50,83 @@ class OpenAIClient:
             })
 
         for msg in messages:
-            openai_messages.append({
-                "role": msg.role,
-                "content": msg.content
-            })
+            # Check if message has tool call data
+            if msg.tool_call_data:
+                # Assistant message with tool_calls
+                if "tool_calls" in msg.tool_call_data:
+                    openai_messages.append({
+                        "role": "assistant",
+                        "content": msg.content,
+                        "tool_calls": msg.tool_call_data["tool_calls"]
+                    })
+
+                    # Add tool result messages
+                    if "tool_results" in msg.tool_call_data:
+                        for result in msg.tool_call_data["tool_results"]:
+                            openai_messages.append({
+                                "role": "tool",
+                                "tool_call_id": result["tool_call_id"],
+                                "name": result["name"],
+                                "content": json.dumps(result["result"])
+                            })
+
+                    # Add final assistant response after tools
+                    if msg.content:
+                        openai_messages.append({
+                            "role": "assistant",
+                            "content": msg.content
+                        })
+            else:
+                # Regular message without tools
+                openai_messages.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+
+        return openai_messages
+
+    async def chat_completion(
+            self,
+            messages: list[AgentMessage],
+            system_message: str | None = None,
+            tools: list[dict[str, Any]] | None = None
+    ) -> ChatCompletion:
+        """
+        Call OpenAI API with proper error handling.
+
+        Args:
+            messages: Message history (AgentMessage DTOs)
+            system_message: System message (optional)
+            tools: OpenAI function calling schemas (optional)
+
+        Returns:
+            Full ChatCompletion response object
+
+        Raises:
+            LLMAuthenticationError: Invalid API key
+            LLMRateLimitError: Rate limit exceeded
+            LLMContextLengthError: Context length exceeded
+            LLMError: Other LLM errors
+        """
+        # Convert AgentMessage to OpenAI format
+        openai_messages = self._build_openai_messages(messages, system_message)
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=openai_messages,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
-            )
+            # Build request parameters
+            request_params = {
+                "model": self.model,
+                "messages": openai_messages,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens
+            }
 
-            return response.choices[0].message.content
+            # Add tools if provided
+            if tools:
+                request_params["tools"] = tools
+
+            response = await self.client.chat.completions.create(**request_params)
+
+            return response
 
         except AuthenticationError as e:
             logger.error(f"OpenAI authentication failed: {e}")

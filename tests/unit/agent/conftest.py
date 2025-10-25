@@ -40,10 +40,12 @@ def orchestrator():
 @pytest.fixture
 def sample_request():
     """Sample AgentRequest for testing."""
+    from uuid import UUID
     return AgentRequest(
         chat_history=[
             AgentMessage(role="user", content="Hello"),
             AgentMessage(role="assistant", content="Hi there!"),
         ],
-        user_message=AgentMessage(role="user", content="How are you?")
+        user_message=AgentMessage(role="user", content="How are you?"),
+        chat_id=UUID("00000000-0000-0000-0000-000000000001")
     )

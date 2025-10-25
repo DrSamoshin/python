@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import DateTime, ForeignKey, Text, func, Enum as SQLEnum
+from sqlalchemy import DateTime, ForeignKey, Text, func, Enum as SQLEnum, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.models.user import Base
@@ -32,7 +32,8 @@ class Message(Base):
         SQLEnum(MessageRole, name="message_role"),
         nullable=False
     )
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tool_call_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

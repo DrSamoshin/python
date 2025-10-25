@@ -5,7 +5,10 @@
       "Bash(curl:*)",
       "Bash(lsof:*)",
       "Bash(xargs kill:*)",
-      "Bash(uv pip install:*)"
+      "Bash(uv pip install:*)",
+      "Bash(tree -L 2 src/)",
+      "Bash(python -m pytest tests/unit/api/services/test_chat_session_service.py::TestChatSessionServiceProcessing::test_process_user_message_success -v)",
+      "Bash(python -m py_compile:*)"
     ],
     "deny": [],
     "ask": []
