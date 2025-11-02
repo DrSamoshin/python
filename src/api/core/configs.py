@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         """Get database URL based on environment."""
         urls = {
-            "dev": "postgresql+asyncpg://dev_user:dev_pass@localhost:5432/myapp_dev",
+            "dev": "postgresql+asyncpg://aimi:KG85056710a@35.241.254.110:5432/aimi_db",
+            # "dev": "postgresql+asyncpg://dev_user:dev_pass@localhost:5432/myapp_dev",
             "prod": os.getenv("DATABASE_URL", ""),
         }
         return urls.get(self.env, urls["dev"])
@@ -40,7 +41,8 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
         """Get Redis URL based on environment."""
         urls = {
-            "dev": "redis://localhost:6379/0",
+            "dev": "redis://:KG85056710a@35.241.254.110:6379/0",
+            # "dev": "redis://localhost:6379/0",
             "prod": os.getenv("REDIS_URL", ""),
         }
         return urls.get(self.env, urls["dev"])

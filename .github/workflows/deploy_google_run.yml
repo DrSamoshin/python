@@ -1,0 +1,26 @@
+name: Deploy to Cloud Run
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCLOUD_SA_KEY }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: python-api
+          image: europe-west1-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT_ID }}/python-api/python-api:latest
+          region: europe-west1
+          allow_unauthenticated: true
+          env_vars: |
+            API_ENV=prod
+            API_DATABASE_URL=${{ secrets.DATABASE_URL }}
+            API_REDIS_URL=${{ secrets.REDIS_URL }}
+            API_JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
